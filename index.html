@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kućni pregled finansija</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#12161d; --surface:#1a2029; --surface-2:#212836; --line:#2a3141;
+    --text:#e9e6dd; --muted:#8b93a3; --gold:#c9a227; --gold-dim:#8a7220;
+    --green:#5aa06c; --red:#c0563f; --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 80px;}
+
+  header{ display:flex;justify-content:space-between;align-items:flex-end; border-bottom:1px solid var(--line); padding-bottom:18px;margin-bottom:28px; flex-wrap:wrap;gap:12px; }
+  h1{ font-family:'Newsreader',serif;font-weight:500; font-size:32px;margin:0;letter-spacing:-.01em; }
+  .status{ font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted); text-align:right; }
+  .status button{
+    font-family:'Inter',sans-serif;font-size:12px;font-weight:600;
+    background:transparent;border:1px solid var(--gold-dim);color:var(--gold);
+    padding:7px 14px;border-radius:var(--radius);cursor:pointer;margin-left:10px;
+    transition:background .15s, color .15s;
+  }
+  .status button:hover{background:var(--gold);color:#12161d;}
+  .status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;}
+  .status-dot.err{background:var(--red);}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:36px;}
+  .kpi{background:var(--surface);padding:18px 20px;}
+  .kpi .label{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .kpi .value{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:600;letter-spacing:-.01em;}
+  .kpi .value.pos{color:var(--green);}
+  .kpi .value.neg{color:var(--red);}
+  .kpi .sub{font-size:11px;color:var(--muted);margin-top:6px;}
+  @media(max-width:720px){ .kpis{grid-template-columns:repeat(2,1fr);} }
+
+  section{margin-bottom:40px;}
+  .section-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;}
+  .section-num{font-family:'JetBrains Mono',monospace;color:var(--gold);font-size:12px;}
+  h2{font-family:'Newsreader',serif;font-weight:500;font-size:20px;margin:0;}
+  .panel{background:var(--surface);border:1px solid var(--line);padding:20px;}
+
+  .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);}
+  .grid-2 > div{background:var(--surface);padding:20px;}
+  @media(max-width:820px){.grid-2{grid-template-columns:1fr;}}
+
+  canvas{max-width:100%;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{ font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase; color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line); }
+  td{padding:9px 10px;border-bottom:1px solid var(--line);font-family:'Inter',sans-serif;}
+  td.num{font-family:'JetBrains Mono',monospace;text-align:right;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:var(--surface-2);}
+
+  .bar-row{margin-bottom:16px;}
+  .bar-row:last-child{margin-bottom:0;}
+  .bar-label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;}
+  .bar-label .pct{font-family:'JetBrains Mono',monospace;color:var(--gold);}
+  .bar-track{height:6px;background:var(--surface-2);overflow:hidden;}
+  .bar-fill{height:100%;background:var(--gold);}
+
+  .invest-summary{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:20px;}
+  .invest-summary > div{background:var(--surface-2);padding:14px 18px;flex:1;}
+  .invest-summary .label{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;}
+  .invest-summary .val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;}
+
+  .empty{color:var(--muted);font-size:13px;padding:20px 0;text-align:center;}
+  .loading{color:var(--muted);font-size:13px;padding:40px 0;text-align:center;font-family:'JetBrains Mono',monospace;}
+
+  footer{ margin-top:60px;padding-top:18px;border-top:1px solid var(--line); font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted); display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px; }
+  details.dbg{margin-top:16px;}
+  details.dbg summary{cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);}
+  details.dbg pre{white-space:pre-wrap;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="lockScreen" style="position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="max-width:320px;width:100%;text-align:center;">
+      <h1 style="font-size:22px;margin-bottom:24px;">Kućni pregled finansija</h1>
+      <input type="password" id="lockPassword" placeholder="Lozinka" style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px;padding:12px 14px;border-radius:var(--radius);margin-bottom:12px;box-sizing:border-box;">
+      <button id="lockSubmit" style="width:100%;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;background:var(--gold);border:none;color:#12161d;padding:12px;border-radius:var(--radius);cursor:pointer;">Otvori</button>
+      <div id="lockError" style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--red);margin-top:12px;min-height:16px;"></div>
+    </div>
+  </div>
+
+  <div id="dashboardContent" style="display:none;">
+
+  <header>
+    <div><h1>Kućni pregled finansija</h1></div>
+    <div class="status">
+      <div><span class="status-dot" id="statusDot"></span><span id="statusText">Učitavanje…</span></div>
+      <button id="refreshBtn">Osveži</button>
+    </div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">Bilans (ukupno)</div><div class="value" id="kpiBalance">—</div><div class="sub">od početka praćenja</div></div>
+    <div class="kpi"><div class="label">Prihod — ovaj mesec</div><div class="value pos" id="kpiIncome">—</div><div class="sub" id="kpiIncomeSub">&nbsp;</div></div>
+    <div class="kpi"><div class="label">Trošak — ovaj mesec</div><div class="value neg" id="kpiExpense">—</div><div class="sub" id="kpiExpenseSub">&nbsp;</div></div>
+    <div class="kpi"><div class="label">Ušteđeno — ovaj mesec</div><div class="value" id="kpiSaved">—</div><div class="sub" id="kpiSavedSub">&nbsp;</div></div>
+  </div>
+
+  <section>
+    <div class="section-head"><span class="section-num">01</span><h2>Prihodi i troškovi kroz godinu</h2></div>
+    <div class="panel"><canvas id="trendChart" height="90"></canvas></div>
+  </section>
+
+  <section>
+    <div class="grid-2">
+      <div>
+        <div class="section-head"><span class="section-num">02</span><h2>Troškovi po kategoriji</h2></div>
+        <canvas id="catChart" height="220"></canvas>
+      </div>
+      <div>
+        <div class="section-head"><span class="section-num">03</span><h2>Finansijski ciljevi</h2></div>
+        <div id="goalsBody"><div class="loading">Učitavanje…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="section-num">04</span><h2>Investicioni portfolio</h2></div>
+    <div class="panel">
+      <div id="investSummary"></div>
+      <div class="grid-2" style="border:none;background:none;gap:20px;">
+        <div style="background:var(--surface);padding:0;"><canvas id="investChart" height="220"></canvas></div>
+        <div style="background:var(--surface);padding:0;"><div id="investBody"><div class="loading">Učitavanje…</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="grid-2">
+      <div>
+        <div class="section-head"><span class="section-num">05</span><h2>Zanimljivosti</h2></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Poslednjih 5 transakcija</div>
+        <div id="recentTxBody"><div class="loading">Učitavanje…</div></div>
+      </div>
+      <div>
+        <div class="section-head"><span class="section-num">&nbsp;</span><h2 style="visibility:hidden;">.</h2></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Brze činjenice</div>
+        <div id="funFactsBody"><div class="loading">Učitavanje…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Izvor: Google Apps Script (live)</span>
+    <span id="lastUpdated">—</span>
+  </footer>
+
+  <details class="dbg">
+    <summary>Dijagnostika (privremeno)</summary>
+    <pre id="debugBox">Učitavanje…</pre>
+  </details>
+
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxXOVBUSYhBk_nHFblaH4shSdyBnoKoi3yvMdgJyDuaVZv40IKGKlMtzIIQOy884RI2DA/exec";
+
+const fmtRSD = n => isFinite(n) ? Math.round(n).toLocaleString('sr-RS') + " RSD" : "—";
+
+let jsonpCounter = 0;
+function fetchDashboardData(){
+  return new Promise((resolve, reject) => {
+    const cbName = 'dashCB_' + (jsonpCounter++) + '_' + Date.now();
+    const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout pri učitavanju')); }, 20000);
+    function cleanup(){
+      clearTimeout(timer);
+      delete window[cbName];
+      if(script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = (data) => { cleanup(); resolve(data); };
+    const script = document.createElement('script');
+    script.src = `${APPS_SCRIPT_URL}?callback=${cbName}&_t=${Date.now()}`;
+    script.onerror = () => { cleanup(); reject(new Error('Ne mogu da učitam podatke sa Apps Script endpoint-a')); };
+    document.body.appendChild(script);
+  });
+}
+
+function parseNum(v){
+  if(v===undefined||v===null) return NaN;
+  let s = String(v).trim();
+  if(s==="") return NaN;
+  s = s.replace(/[^\d,.\-]/g,'');
+  if(s==="") return NaN;
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if(lastComma>-1 && lastDot>-1){
+    if(lastComma > lastDot) s = s.replace(/\./g,'').replace(',', '.');
+    else s = s.replace(/,/g,'');
+  } else if(lastComma>-1){
+    s = s.replace(',', '.');
+  }
+  return parseFloat(s);
+}
+
+function parseDate(v){
+  if(!v) return null;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function isExpenseRow(type, amt){
+  const t = (type||'').toLowerCase();
+  if(/rashod|trosak|trošak|izdatak|expense|minus/.test(t)) return true;
+  if(/prihod|income|plus|uplata/.test(t)) return false;
+  return amt < 0;
+}
+
+function fact(label, value, sub){
+  return `<div style="margin-bottom:16px;">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${label}</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:600;color:var(--gold);">${value}</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">${sub}</div>
+  </div>`;
+}
+
+function assetEmoji(text){
+  const t = (text||'').toLowerCase();
+  if(/zlato|gold/.test(t)) return '🪙';
+  if(/srebro|silver/.test(t)) return '🥈';
+  if(/etf/.test(t)) return '📈';
+  if(/akcij|stock|deonic/.test(t)) return '📊';
+  if(/kript|crypto|bitcoin|btc|eth/.test(t)) return '₿';
+  if(/nekretnin|real estate|imovina/.test(t)) return '🏠';
+  if(/gotovin|cash|štednj|stednj/.test(t)) return '💵';
+  if(/obveznic|bond/.test(t)) return '📜';
+  return '💼';
+}
+
+const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SR = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Avg','Sep','Okt','Nov','Dec'];
+
+let trendChart, catChart, investChart;
+
+function renderKPIsAndTrend(tekucaGodina){
+  const monthRows = tekucaGodina.filter(r => MONTHS_EN.includes(r['Mesec']));
+  const totalRow = tekucaGodina.find(r => (r['Mesec']||'').toUpperCase() === 'UKUPNO');
+
+  if(totalRow){
+    const bal = parseNum(totalRow['Bilans']);
+    document.getElementById('kpiBalance').textContent = fmtRSD(bal);
+    document.getElementById('kpiBalance').className = 'value ' + (bal>=0?'pos':'neg');
+  }
+
+  const now = new Date();
+  const curMonthName = MONTHS_EN[now.getMonth()];
+  const curRow = monthRows.find(r => r['Mesec']===curMonthName);
+  if(curRow){
+    const inc = parseNum(curRow['Prihodi']);
+    const exp = parseNum(curRow['Rashodi']);
+    const saved = parseNum(curRow['Uloženo/Sačuvano']);
+    document.getElementById('kpiIncome').textContent = fmtRSD(inc);
+    document.getElementById('kpiExpense').textContent = fmtRSD(exp);
+    document.getElementById('kpiSaved').textContent = fmtRSD(saved);
+    const monthLabel = now.toLocaleDateString('sr-RS',{month:'long'});
+    document.getElementById('kpiIncomeSub').textContent = monthLabel;
+    document.getElementById('kpiExpenseSub').textContent = monthLabel;
+    document.getElementById('kpiSavedSub').textContent = monthLabel;
+  }
+
+  const ctx = document.getElementById('trendChart');
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: monthRows.map(r => MONTHS_SR[MONTHS_EN.indexOf(r['Mesec'])]),
+      datasets:[
+        {label:'Prihod', data: monthRows.map(r=>parseNum(r['Prihodi'])), borderColor:'#5aa06c', backgroundColor:'rgba(90,160,108,0.08)', tension:.3, fill:true, pointRadius:3},
+        {label:'Trošak', data: monthRows.map(r=>parseNum(r['Rashodi'])), borderColor:'#c0563f', backgroundColor:'rgba(192,86,63,0.08)', tension:.3, fill:true, pointRadius:3},
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{labels:{color:'#e9e6dd', font:{family:'Inter'}}}},
+      scales:{
+        x:{ticks:{color:'#8b93a3'}, grid:{color:'#2a3141'}},
+        y:{ticks:{color:'#8b93a3'}, grid:{color:'#2a3141'}}
+      }
+    }
+  });
+}
+
+function renderTransactionInsights(rows){
+  const parsed = rows.map(r => ({
+    date: parseDate(r['Vreme']),
+    amt: parseNum(r['RSD iznos'] || r['Iznos']),
+    type: (r['Vrsta']||'').trim(),
+    cat: (r['Kategorija']||'Ostalo').trim(),
+    desc: (r['Opis']||'').trim(),
+  })).filter(r => r.date && isFinite(r.amt));
+
+  // category doughnut (expenses only)
+  const catTotals = {};
+  parsed.forEach(r=>{
+    if(!isExpenseRow(r.type, r.amt)) return;
+    catTotals[r.cat] = (catTotals[r.cat]||0) + Math.abs(r.amt);
+  });
+  const catEntries = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const catCtx = document.getElementById('catChart');
+  if(catChart) catChart.destroy();
+  const palette = ['#c9a227','#8a7220','#5aa06c','#c0563f','#4a6fa5','#8b93a3','#7a5ea8','#b17a3e'];
+  catChart = new Chart(catCtx, {
+    type:'doughnut',
+    data:{
+      labels: catEntries.map(e=>e[0]),
+      datasets:[{data: catEntries.map(e=>e[1]), backgroundColor: palette, borderColor:'#1a2029', borderWidth:2}]
+    },
+    options:{ plugins:{legend:{position:'bottom', labels:{color:'#e9e6dd', font:{family:'Inter', size:11}, boxWidth:10}}} }
+  });
+
+  // recent 5 + fun facts
+  const recentBody = document.getElementById('recentTxBody');
+  const factsBody = document.getElementById('funFactsBody');
+  if(!parsed.length){
+    recentBody.innerHTML = '<div class="empty">Nema podataka.</div>';
+    factsBody.innerHTML = '<div class="empty">Nema podataka.</div>';
+    return parsed.length;
+  }
+  const sorted = [...parsed].sort((a,b)=>b.date-a.date);
+  let html = '<table><tbody>';
+  sorted.slice(0,5).forEach(r=>{
+    const isExp = isExpenseRow(r.type, r.amt);
+    html += `<tr>
+      <td style="color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap;">${r.date.toLocaleDateString('sr-RS',{day:'2-digit',month:'2-digit'})}</td>
+      <td>${r.desc || r.cat}</td>
+      <td class="num" style="color:${isExp?'var(--red)':'var(--green)'}">${isExp?'−':'+'}${fmtRSD(Math.abs(r.amt))}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  recentBody.innerHTML = html;
+
+  const expenses = parsed.filter(r => isExpenseRow(r.type, r.amt));
+  let factsHtml = '';
+  if(expenses.length){
+    const biggest = expenses.reduce((a,b)=> Math.abs(b.amt)>Math.abs(a.amt) ? b : a);
+    factsHtml += fact('Najskuplja transakcija', fmtRSD(Math.abs(biggest.amt)), `${biggest.desc || biggest.cat} · ${biggest.date.toLocaleDateString('sr-RS')}`);
+  }
+  const catCounts = {};
+  expenses.forEach(r => { catCounts[r.cat] = (catCounts[r.cat]||0) + 1; });
+  const topCat = Object.entries(catCounts).sort((a,b)=>b[1]-a[1])[0];
+  if(topCat) factsHtml += fact('Najčešća kategorija troška', topCat[0], `${topCat[1]} transakcija`);
+  if(expenses.length){
+    const avg = expenses.reduce((s,r)=>s+Math.abs(r.amt),0) / expenses.length;
+    factsHtml += fact('Prosečan trošak', fmtRSD(avg), 'po transakciji');
+  }
+  factsBody.innerHTML = factsHtml || '<div class="empty">Nema podataka.</div>';
+  return parsed.length;
+}
+
+function renderGoals(rows){
+  const container = document.getElementById('goalsBody');
+  if(!rows || !rows.length){ container.innerHTML = '<div class="empty">Nema ciljeva.</div>'; return; }
+  let html = '';
+  rows.forEach(r=>{
+    const name = r['Naziv cilja'];
+    if(!name) return;
+    const target = parseNum(r['Ciljani iznos']);
+    const current = parseNum(r['Sakupljeno']);
+    if(!isFinite(target) || target<=0) return;
+    const pct = Math.min(100, Math.max(0,(current/target)*100));
+    html += `<div class="bar-row">
+      <div class="bar-label"><span>${name}</span><span class="pct">${pct.toFixed(0)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="sub" style="margin-top:4px;color:var(--muted);font-size:11px;">${fmtRSD(current)} / ${fmtRSD(target)}</div>
+    </div>`;
+  });
+  container.innerHTML = html || '<div class="empty">Nema aktivnih ciljeva.</div>';
+}
+
+function renderInvestments(rows){
+  const totalRow = rows.find(r => !r['Naziv'] && !r['Tip']);
+  const items = rows.filter(r => r['Naziv'] || r['Tip']);
+
+  const summaryEl = document.getElementById('investSummary');
+  if(totalRow){
+    summaryEl.innerHTML = `<div class="invest-summary">
+      <div><div class="label">Uloženo ukupno</div><div class="val">€${parseNum(totalRow['Uloženo ukupno']).toLocaleString('sr-RS')}</div></div>
+      <div><div class="label">Trenutna vrednost</div><div class="val">€${parseNum(totalRow['Trenutna vrednost']).toLocaleString('sr-RS')}</div></div>
+      <div><div class="label">Dobit/Gubitak</div><div class="val" style="color:var(--green);">€${parseNum(totalRow['Dobit/Gubitak']).toLocaleString('sr-RS')}</div></div>
+    </div>`;
+  }
+
+  const container = document.getElementById('investBody');
+  if(!items.length){ container.innerHTML = '<div class="empty">Nema investicija.</div>'; return; }
+  let html = '<table><thead><tr><th></th><th>Naziv</th><th>Vrednost</th><th>Dobit</th></tr></thead><tbody>';
+  items.forEach(it=>{
+    html += `<tr>
+      <td style="font-size:16px;">${assetEmoji(it['Tip']||it['Naziv'])}</td>
+      <td>${it['Naziv']}<div style="font-size:11px;color:var(--muted);">${it['Tip']}</div></td>
+      <td class="num">${it['Trenutna vrednost']}</td>
+      <td class="num" style="color:var(--green);">${it['Dobit/Gubitak']}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  const chartCtx = document.getElementById('investChart');
+  if(investChart) investChart.destroy();
+  const withValues = items.map(it => ({name: it['Naziv'], value: parseNum(it['Trenutna vrednost'])})).filter(x=>isFinite(x.value) && x.value>0);
+  if(withValues.length){
+    const palette = ['#c9a227','#8a7220','#5aa06c','#c0563f','#4a6fa5','#8b93a3','#7a5ea8'];
+    investChart = new Chart(chartCtx, {
+      type:'doughnut',
+      data:{
+        labels: withValues.map(x=>x.name),
+        datasets:[{data: withValues.map(x=>x.value), backgroundColor: palette, borderColor:'#1a2029', borderWidth:2}]
+      },
+      options:{ plugins:{legend:{position:'bottom', labels:{color:'#e9e6dd', font:{family:'Inter', size:11}, boxWidth:10}}} }
+    });
+  }
+}
+
+async function loadAll(){
+  document.getElementById('statusDot').className = 'status-dot';
+  document.getElementById('statusText').textContent = 'Učitavanje…';
+  const dbg = [];
+
+  try {
+    const data = await fetchDashboardData();
+    dbg.push(`Transakcije: ${data.transakcije.length} redova`);
+    dbg.push(`Investicije: ${data.investicije.length} redova`);
+    dbg.push(`Ciljevi: ${data.ciljevi.length} redova`);
+    dbg.push(`Tekuća godina: ${data.tekucaGodina.length} redova`);
+    dbg.push(`Kućni pregled: ${JSON.stringify(data.kucniPregled)}`);
+    dbg.push(`Generisano: ${data.generatedAt}`);
+
+    renderKPIsAndTrend(data.tekucaGodina || []);
+    renderTransactionInsights(data.transakcije || []);
+    renderGoals(data.ciljevi || []);
+    renderInvestments(data.investicije || []);
+
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = 'Sinhronizovano';
+  } catch(e){
+    dbg.push(`GREŠKA — ${e.message}`);
+    document.getElementById('statusDot').className = 'status-dot err';
+    document.getElementById('statusText').textContent = 'Greška pri učitavanju';
+  }
+
+  document.getElementById('debugBox').textContent = dbg.join('\n');
+  document.getElementById('lastUpdated').textContent = 'Poslednje osvežavanje: ' + new Date().toLocaleTimeString('sr-RS');
+}
+
+const PASSWORD_HASH = "95ab7a3764e0a0c21b36c7d1c3b8a52b5bab8c6f1ad55f0a8df743471a88d300";
+const UNLOCK_KEY = "dashboard-unlocked-v1";
+
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function showDashboard(){
+  document.getElementById('lockScreen').style.display = 'none';
+  document.getElementById('dashboardContent').style.display = 'block';
+  document.getElementById('refreshBtn').addEventListener('click', loadAll);
+  loadAll();
+}
+
+async function tryUnlock(){
+  const val = document.getElementById('lockPassword').value;
+  const hash = await sha256Hex(val);
+  if(hash === PASSWORD_HASH){
+    try { localStorage.setItem(UNLOCK_KEY, '1'); } catch(e){}
+    showDashboard();
+  } else {
+    document.getElementById('lockError').textContent = 'Pogrešna lozinka.';
+    document.getElementById('lockPassword').value = '';
+  }
+}
+
+document.getElementById('lockSubmit').addEventListener('click', tryUnlock);
+document.getElementById('lockPassword').addEventListener('keydown', (e) => { if(e.key === 'Enter') tryUnlock(); });
+
+let alreadyUnlocked = false;
+try { alreadyUnlocked = localStorage.getItem(UNLOCK_KEY) === '1'; } catch(e){}
+if(alreadyUnlocked){
+  showDashboard();
+}
+</script>
+</body>
+</html>
